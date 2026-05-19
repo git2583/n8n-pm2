@@ -42,10 +42,30 @@
     exec(`${startCmd} ${openUrl}`);
     ```
 
-## 3. 검증 및 결과
-- `manager.js` 수정 후 프로세스 재시작을 통해 설정값 반영 확인.
-- 확장된 헤더 크기를 통해 OAuth 인증 흐름이 정상적으로 진행될 수 있는 환경 구축.
-- n8n 실행 완료 시 설정된 `WEBHOOK_URL`로 브라우저가 자동 실행됨을 확인.
+## 3. 작업 일시: 2026-05-19
+- **핵심 목표**: Google Gemini 노드 서비스 가용성 문제 및 Gmail 노드 데이터 타입 오류 해결
+
+## 4. 주요 작업 내용 및 트러블슈팅
+
+### 4.1. Google Gemini 'Service unavailable' (503) 에러 해결
+- **문제**: Google Gemini 노드 실행 중 `Service unavailable - try again later` 에러 발생하며 워크플로우 중단.
+- **원인**: Google API 서버의 일시적 과부하 또는 무료 티어 할당량 제한으로 인한 응답 거부.
+- **해결 방법**:
+  - Gemini 노드의 **Settings > On Fail** 설정을 `Retry`로 변경.
+  - **Maximum Retries**: 3~5회, **Wait Between Retries**: 5000ms 설정.
+  - **Exponential Backoff**를 활성화하여 재시도 간격을 점진적으로 늘려 서버 부하 대응.
+
+### 4.2. Gmail 노드 'trim is not a function' 에러 해결
+- **문제**: Gmail 노드에서 메시지 전송 시 `this.getNodeParameter(...).trim is not a function` 에러 발생.
+- **원인**: `To`(수신자) 또는 `Message`(본문) 필드에 문자열이 아닌 값(숫자, null, 객체 등)이 전달되어 내부 `.trim()` 함수 호출 실패.
+- **해결 방법**:
+  - 에러가 발생하는 필드의 표현식을 강제 문자열 변환 방식으로 수정.
+  - **수정 예시**: `{{ String($json.variable) }}` 또는 `{{ $json.variable.toString() }}`
+  - 데이터가 비어있을 경우를 대비하여 기본값 처리 추가: `{{ $json.variable || "" }}`
+
+## 5. 검증 및 결과
+- Gemini 노드에 재시도 로직을 적용하여 일시적인 API 장애 시에도 워크플로우가 자동으로 복구됨을 확인.
+- Gmail 노드의 입력값을 문자열로 강제 변환하여 데이터 타입 불일치로 인한 중단 현상 해결.
 
 ---
 *본 문서는 n8n-pm2 프로젝트의 유지보수 및 향후 유사 에러 대응을 위해 작성되었습니다.*
